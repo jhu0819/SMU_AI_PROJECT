@@ -160,7 +160,7 @@ def main():
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         # 워크플로 실행
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🐰"):
             with st.spinner("생각 중..."):
                 try:
                     # 그래프 실행
