@@ -65,8 +65,18 @@ def init_session_state():
 
 def display_message(role: str, content: str, workflow_info: dict = None):
     """메시지 표시"""
-    with st.chat_message(role):
+
+    if role == "user":
+        avatar = "🌸"
+    else:
+        avatar = "🐰"
+
+    with st.chat_message(role, avatar=avatar):
         st.markdown(content)
+
+        # 워크플로 정보가 있으면 표시
+        if role == "assistant" and workflow_info:
+            display_workflow_info(workflow_info)
 
         # 워크플로 정보가 있으면 표시 (assistant 메시지에만)
         if role == "assistant" and workflow_info:
@@ -194,7 +204,7 @@ def main():
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         # 워크플로 실행
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🐰"):
             with st.spinner("생각 중..."):
                 try:
                     # 그래프 실행
