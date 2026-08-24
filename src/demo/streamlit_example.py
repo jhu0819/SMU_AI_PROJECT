@@ -1,3 +1,4 @@
+import base64
 import os
 import sys
 from pathlib import Path
@@ -14,6 +15,47 @@ from ai import create_graph
 load_dotenv()
 
 graph = create_graph()
+
+LOGO_PATH = Path(__file__).parent / "assets" / "sangmyung_logo.jpg"
+
+
+def set_background_logo():
+    """대화창 배경에 학교 로고를 워터마크로 표시"""
+    if not LOGO_PATH.exists():
+        return
+
+    encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            position: relative;
+        }}
+        .stApp::before {{
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/jpeg;base64,{encoded}");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 40%;
+            opacity: 0.06;
+            pointer-events: none;
+            z-index: 0;
+        }}
+        .stApp > * {{
+            position: relative;
+            z-index: 1;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 def init_session_state():
     """세션 상태 초기화"""
@@ -89,6 +131,8 @@ def main():
         page_icon="🎓",
         layout="wide"
     )
+
+    set_background_logo()
 
     st.title("🎓 상명대 학사 안내 에이전트 워크플로")
     st.markdown("---")
