@@ -36,9 +36,8 @@ class Text2SQLEngine:
 </database_schema>
 
 <table_descriptions>
-- organizations: 천안시 조직 정보 (id, org_name)
-- departments: 부서 정보 (id, dept_name, dept_phone, org_id)
-- office_floors: 사무실 층 정보 (id, building, floor, dept_id)
+- art: 문화예술교육사(2급) 인정 학과(전공) 정보 (id, 분야, 단과대학, 학과(전공))
+- art_2: 문화예술교육사(2급) 인정 교과목 정보 (id, 분야, 신청 교과목명, 학점, 개설학년, 인정시기, 비고)
 </table_descriptions>
 
 <rules>
