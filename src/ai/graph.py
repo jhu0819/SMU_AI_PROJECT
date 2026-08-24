@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
-from state import AgentState, InputState
-from nodes import (
+from ai.state import AgentState, InputState
+from ai.nodes import (
     classify_intent,
     general_answer,
     vector_search,
