@@ -74,10 +74,6 @@ def display_message(role: str, content: str, workflow_info: dict = None):
     with st.chat_message(role, avatar=avatar):
         st.markdown(content)
 
-        # 워크플로 정보가 있으면 표시
-        if role == "assistant" and workflow_info:
-            display_workflow_info(workflow_info)
-
         # 워크플로 정보가 있으면 표시 (assistant 메시지에만)
         if role == "assistant" and workflow_info:
             display_workflow_info(workflow_info)
