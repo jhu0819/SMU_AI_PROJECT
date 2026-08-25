@@ -331,6 +331,20 @@ def generate_answer(state: AgentState) -> AgentState:
     # 대화 히스토리 가져오기
     messages = state.get("messages", [])
 
+    # 검색 결과가 전혀 없는 경우, LLM 호출 없이 고정 답변을 반환
+    # (프롬프트 지시만으로는 "정보 없음" 처리를 100% 보장할 수 없어 코드로 강제)
+    if (
+        state.get("intent") in ("vector", "database")
+        and not state.get("vector_results")
+        and not state.get("db_results")
+    ):
+        return {
+            "messages": [AIMessage(
+                content="해당 정보를 찾을 수 없습니다. 이 챗봇은 상명대학교 학사 정보만 안내합니다."
+            )],
+            "citations": [],
+        }
+
     # 컨텍스트 구성
     context_parts = []
 

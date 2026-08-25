@@ -256,7 +256,10 @@ def main():
                 answer, result = stream_graph_response(prompt)
 
                 if not answer:
-                    answer = "죄송합니다. 답변을 생성할 수 없습니다."
+                    # 스트리밍 청크가 없는 경우(예: 검색 결과가 없어 LLM 호출 없이
+                    # 고정 답변을 반환한 경우), 최종 상태에 담긴 답변을 그대로 표시
+                    final_messages = result.get("messages", [])
+                    answer = final_messages[-1].content if final_messages else "죄송합니다. 답변을 생성할 수 없습니다."
                     st.markdown(answer)
 
                 # 근거 검증 결과 및 출처 인용 표시
