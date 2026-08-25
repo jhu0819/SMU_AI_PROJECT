@@ -13,7 +13,7 @@
 5. 단국대학교 수강신청 기간
 
 # 데모 실행 화면
-<img width="1432" height="700" alt="image" src="https://github.com/user-attachments/assets/66bdb591-11e9-4f4d-87d3-f83571edbc8b" />
+<img width="1432" height="695" alt="image" src="https://github.com/user-attachments/assets/378831be-2578-4411-98dd-a0d7ebc62184" />
 <img width="1432" height="363" alt="image" src="https://github.com/user-attachments/assets/fc4194f8-c79c-456d-8696-f97992394750" />
 <img width="1432" height="630" alt="image" src="https://github.com/user-attachments/assets/e374d64e-53c4-4581-8d2a-5436099a3eb6" />
 <img width="1432" height="658" alt="image" src="https://github.com/user-attachments/assets/ccce4d6d-1b5b-4e2c-9725-f6e51be33398" />
