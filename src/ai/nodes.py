@@ -285,7 +285,17 @@ def database_query(state: AgentState) -> AgentState:
     # 대화 히스토리 가져오기
     messages = state.get("messages", [])
     question = state.get("question", "")
+
+    text2sql_engine = get_cached_text2sql_engine()
+
+    # 이전 시도의 피드백 구성: SQL 오류뿐 아니라 "0건 반환"도 재시도에 활용
     previous_error = state.get("error")
+    previous_sql = state.get("sql_query")
+    if not previous_error and previous_sql and text2sql_engine.is_empty_result(state.get("db_results")):
+        previous_error = (
+            f"이전 쿼리가 결과를 찾지 못했습니다 (0건 반환):\n{previous_sql}\n"
+            "WHERE 조건에 사용한 값이 실제 데이터에 존재하는지, 불필요한 필터를 걸고 있지는 않은지 다시 검토하세요."
+        )
 
     # 이전 대화 맥락이 있으면 완전한 질문으로 재구성
     if len(messages) > 1:
@@ -307,7 +317,6 @@ def database_query(state: AgentState) -> AgentState:
         complete_question = question
 
     # Text2SQL 실행
-    text2sql_engine = get_cached_text2sql_engine()
     result = text2sql_engine.query(complete_question, previous_error=previous_error)
 
     return {
