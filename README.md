@@ -13,7 +13,7 @@
 5. 단국대학교 수강신청 기간
 
 # 데모 실행 화면
-smu_ai_project ∙ main ∙ src/demo/streamlit_example.py
+https://smuaiproject-eshuepw9r4hfmhpwupjrzr.streamlit.app/
 <img width="1432" height="695" alt="image" src="https://github.com/user-attachments/assets/378831be-2578-4411-98dd-a0d7ebc62184" />
 <img width="1432" height="443" alt="image" src="https://github.com/user-attachments/assets/f98992c4-eb00-4cf5-b9b3-554a1f4e729e" />
 <img width="1432" height="630" alt="image" src="https://github.com/user-attachments/assets/e374d64e-53c4-4581-8d2a-5436099a3eb6" />
