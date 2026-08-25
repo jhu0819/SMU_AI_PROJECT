@@ -1,3 +1,4 @@
+import re
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from ai.state import AgentState
@@ -23,6 +24,17 @@ class VectorSearchQuery(BaseModel):
     categories: Optional[List[str]] = Field(
         default=None,
         description="선택된 카테고리 리스트 (1-2개). 명확하게 관련 있는 카테고리만 선택. 애매하거나 불확실한 경우 null 반환. 가능한 값: 학사일정_휴복학, 다전공_부전공_이수, 졸업_인증, 교육과정_이수기준, 수강신청_계절수업, 성적_학사경고, 원격수업_이러닝, 장학금_학자금대출"
+    )
+
+
+class GroundingCheck(BaseModel):
+    """생성된 답변의 근거 충실도 평가 결과"""
+    is_grounded: bool = Field(
+        description="답변의 핵심 사실이 제공된 근거(문서/DB 결과) 안에 실제로 존재하면 true, 근거 없이 지어내거나 근거와 다르면 false"
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="근거가 부족하다고 판단한 경우 그 이유를 한 문장으로. 근거가 충분하면 null"
     )
 
 
@@ -346,6 +358,15 @@ def generate_answer(state: AgentState) -> AgentState:
 
     context = "\n".join(context_parts)
 
+    docs = state.get("vector_results") or []
+
+    citation_rule = (
+        "- [문서 N] 내용을 인용해서 답변한 문장 끝에는 반드시 해당 번호를 [N] 형식으로 표기하세요 "
+        '(예: "휴학은 최대 4학기까지 가능합니다[1]."). 여러 문서를 참고했다면 [1][2]처럼 모두 표기하세요'
+        if docs else
+        "- 데이터베이스 조회 결과를 바탕으로 답변할 때는 [N] 같은 인용 표기를 사용하지 마세요"
+    )
+
     system_prompt = f"""
 당신은 문화예술교육사(2급) 인정 학과·인정 교과목(art, art_2) 정보와 상명대학교 학사 안내(휴학·복학, 졸업, 수강신청, 성적, 장학금 등) 전문가입니다.
 
@@ -362,6 +383,7 @@ def generate_answer(state: AgentState) -> AgentState:
 - 정보가 정말로 없는 경우에만 "해당 정보를 찾을 수 없습니다"라고 말하세요
 - 사용자에게 도움이 되는 친절하고 자연스러운 어조로 답변하세요
 - 이전 대화 맥락을 고려하여 답변하세요
+{citation_rule}
 """
 
     # 시스템 메시지 + 기존 대화 히스토리
@@ -370,8 +392,78 @@ def generate_answer(state: AgentState) -> AgentState:
     response = llm.invoke(conversation)
     answer = response.content
 
+    # 답변에서 실제로 인용된 [N] 표기를 찾아 출처 목록 구성
+    citations = []
+    if docs:
+        cited_indices = sorted(set(int(n) for n in re.findall(r"\[(\d+)\]", answer)))
+        for idx in cited_indices:
+            if 1 <= idx <= len(docs):
+                doc = docs[idx - 1]
+                citations.append({
+                    "index": idx,
+                    "source": doc.metadata.get("source", "알 수 없음"),
+                    "page": doc.metadata.get("page", "N/A"),
+                })
+
     return {
-        "messages": [AIMessage(content=answer)]
+        "messages": [AIMessage(content=answer)],
+        "citations": citations,
+    }
+
+
+def grade_answer(state: AgentState) -> AgentState:
+    """
+    생성된 답변이 검색된 근거(문서/DB 결과)에 실제로 기반하는지 검증하는 노드
+
+    Args:
+        state: 현재 상태
+
+    Returns:
+        업데이트된 상태 (is_grounded, grounding_reason)
+    """
+    messages = state.get("messages", [])
+    answer = messages[-1].content if messages else ""
+
+    vector_results = state.get("vector_results")
+    db_results = state.get("db_results")
+
+    # 검증할 근거 자체가 없으면 (general 답변 등) 검증을 건너뜀
+    if not vector_results and not db_results:
+        return {"is_grounded": True, "grounding_reason": None}
+
+    context_parts = []
+    if vector_results:
+        for i, doc in enumerate(vector_results, 1):
+            context_parts.append(f"[문서 {i}]\n{doc.page_content}")
+    if db_results:
+        context_parts.append(f"[DB 조회 결과]\n{db_results}")
+    context = "\n\n".join(context_parts)
+
+    system_prompt = f"""
+당신은 AI 답변의 사실 근거를 검증하는 평가자입니다.
+
+아래 <근거> 안의 정보만을 기준으로, <답변>의 핵심 내용이 실제로 근거에 의해 뒷받침되는지 평가하세요.
+
+<근거>
+{context}
+</근거>
+
+<답변>
+{answer}
+</답변>
+
+평가 기준:
+- 답변의 핵심 사실(날짜, 수치, 학점, 학과명 등)이 근거 안에 실제로 존재하면 is_grounded: true
+- 답변이 근거에 없는 내용을 지어내거나(hallucination), 근거와 명백히 다른 내용을 말하면 is_grounded: false
+- 답변이 단순히 "정보를 찾을 수 없다"는 취지라면 is_grounded: true로 간주하세요 (근거 없다고 정직하게 말한 것이므로)
+"""
+
+    structured_llm = llm.with_structured_output(GroundingCheck)
+    grading = structured_llm.invoke([SystemMessage(content=system_prompt)])
+
+    return {
+        "is_grounded": grading.is_grounded,
+        "grounding_reason": grading.reason,
     }
 
 

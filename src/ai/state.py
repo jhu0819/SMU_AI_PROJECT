@@ -22,3 +22,10 @@ class AgentState(MessagesState):
     # 오류 처리
     retry_count: Optional[int] # 재시도 횟수 (기본값 0)
     error: Optional[str] # 오류 메시지
+
+    # 답변 검증 관련
+    is_grounded: Optional[bool] # 답변이 검색된 근거(문서/DB 결과)에 기반하는지 여부
+    grounding_reason: Optional[str] # 근거가 부족하다고 판단된 경우 그 이유
+
+    # 인용 정보
+    citations: Optional[list] # 답변에서 실제로 인용된 출처 목록 [{index, source, page}]

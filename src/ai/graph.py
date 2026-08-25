@@ -7,6 +7,7 @@ from ai.nodes import (
     database_query,
     rewrite_query,
     generate_answer,
+    grade_answer,
     route_by_intent,
     check_vector_results,
     check_db_results,
@@ -24,6 +25,7 @@ def create_graph():
     graph_builder.add_node("database_query", database_query)
     graph_builder.add_node("rewrite_query", rewrite_query)
     graph_builder.add_node("generate_answer", generate_answer)
+    graph_builder.add_node("grade_answer", grade_answer)
 
     # 시작점 설정
     graph_builder.set_entry_point("classify_intent")
@@ -65,8 +67,9 @@ def create_graph():
         }
     )
 
-    # 최종 답변 후 종료
-    graph_builder.add_edge("generate_answer", END)
+    # 최종 답변 생성 후 근거 검증을 거쳐 종료
+    graph_builder.add_edge("generate_answer", "grade_answer")
+    graph_builder.add_edge("grade_answer", END)
 
     # 그래프 컴파일
     graph = graph_builder.compile()

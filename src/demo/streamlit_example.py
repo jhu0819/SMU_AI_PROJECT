@@ -9,6 +9,7 @@ sys.path.insert(0, str(src_dir))
 
 import streamlit as st
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessageChunk
 from ai import create_graph
 
 # 환경 변수 로드
@@ -76,7 +77,56 @@ def display_message(role: str, content: str, workflow_info: dict = None):
 
         # 워크플로 정보가 있으면 표시 (assistant 메시지에만)
         if role == "assistant" and workflow_info:
+            display_citations(workflow_info)
             display_workflow_info(workflow_info)
+
+
+def display_citations(result: dict):
+    """답변 근거 검증 결과와 출처 인용 표시"""
+    if not result:
+        return
+
+    if result.get("is_grounded") is False:
+        st.warning(
+            result.get("grounding_reason")
+            or "검색된 자료에서 명확한 근거를 찾지 못했습니다. 참고용으로만 확인해주세요."
+        )
+
+    citations = result.get("citations")
+    if citations:
+        st.caption("**출처**")
+        for c in citations:
+            page = c.get("page")
+            page_str = f" (p.{page})" if page not in (None, "N/A") else ""
+            st.caption(f"[{c['index']}] {c.get('source', '알 수 없음')}{page_str}")
+    elif result.get("db_results"):
+        st.caption("📊 학사 데이터베이스 조회 결과를 참고했습니다.")
+
+
+def stream_graph_response(prompt: str):
+    """그래프를 스트리밍으로 실행하며 답변 텍스트를 실시간으로 출력하고, (답변, 최종 상태)를 반환"""
+    final_state = {}
+
+    def token_generator():
+        for stream_mode, chunk in graph.stream(
+            {"messages": [{"role": "user", "content": prompt}]},
+            stream_mode=["messages", "values"],
+        ):
+            if stream_mode == "messages":
+                message_chunk, metadata = chunk
+                # 노드가 끝나면 델타(AIMessageChunk)와 별개로 완성된 AIMessage가 한 번
+                # 더 전달되므로, 중복 출력을 막기 위해 델타만 사용한다
+                if (
+                    isinstance(message_chunk, AIMessageChunk)
+                    and metadata.get("langgraph_node") in ("generate_answer", "general_answer")
+                    and message_chunk.content
+                ):
+                    yield message_chunk.content
+            elif stream_mode == "values":
+                final_state.update(chunk)
+
+    answer = st.write_stream(token_generator())
+    return answer, final_state
 
 
 def display_workflow_info(result: dict):
@@ -199,43 +249,36 @@ def main():
         display_message("user", prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
-        # 워크플로 실행
+        # 워크플로 실행 (스트리밍)
         with st.chat_message("assistant", avatar="🐰"):
-            with st.spinner("생각 중..."):
-                try:
-                    # 그래프 실행
-                    result = graph.invoke({
-                        "messages": [{"role": "user", "content": prompt}]
-                    })
+            try:
+                # 그래프를 스트리밍으로 실행하며 답변을 실시간으로 표시
+                answer, result = stream_graph_response(prompt)
 
-                    # 답변 표시 (messages의 마지막 AIMessage에서 추출)
-                    messages = result.get("messages", [])
-                    if messages:
-                        # 마지막 메시지에서 content 추출
-                        last_message = messages[-1]
-                        answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
-                    else:
-                        answer = "죄송합니다. 답변을 생성할 수 없습니다."
-
+                if not answer:
+                    answer = "죄송합니다. 답변을 생성할 수 없습니다."
                     st.markdown(answer)
 
-                    # 워크플로 정보 표시
-                    display_workflow_info(result)
+                # 근거 검증 결과 및 출처 인용 표시
+                display_citations(result)
 
-                    # 어시스턴트 메시지와 워크플로 정보 함께 저장
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": answer,
-                        "workflow_info": result  # 워크플로 정보 저장
-                    })
+                # 워크플로 정보 표시
+                display_workflow_info(result)
 
-                except Exception as e:
-                    error_msg = f"오류가 발생했습니다: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg
-                    })
+                # 어시스턴트 메시지와 워크플로 정보 함께 저장
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": answer,
+                    "workflow_info": result  # 워크플로 정보 저장
+                })
+
+            except Exception as e:
+                error_msg = f"오류가 발생했습니다: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg
+                })
 
 
 if __name__ == "__main__":
