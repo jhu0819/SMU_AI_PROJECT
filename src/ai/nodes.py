@@ -380,7 +380,8 @@ def generate_answer(state: AgentState) -> AgentState:
 - 주어진 정보를 자연스럽고 간결하게 전달하세요
 - 구체적인 날짜, 수치, 학점, 분야, 학과명 등의 정보를 명확히 포함하세요
 - 불필요한 전제 조건이나 한계를 언급하지 말고, 질문에 직접 답변하세요
-- 정보가 정말로 없는 경우에만 "해당 정보를 찾을 수 없습니다"라고 말하세요
+- 위 <context>가 비어있거나, 질문이 상명대학교가 아닌 다른 학교(예: 질문에 다른 대학교 이름이 명시된 경우)에 관한 것이라면, 절대로 일반 지식으로 추측하여 답변하지 말고 "해당 정보를 찾을 수 없습니다. 이 챗봇은 상명대학교 학사 정보만 안내합니다."라고 답변하세요
+- 그 외의 경우, 정보가 정말로 없는 경우에만 "해당 정보를 찾을 수 없습니다"라고 말하세요
 - 사용자에게 도움이 되는 친절하고 자연스러운 어조로 답변하세요
 - 이전 대화 맥락을 고려하여 답변하세요
 {citation_rule}
@@ -424,12 +425,12 @@ def grade_answer(state: AgentState) -> AgentState:
     messages = state.get("messages", [])
     answer = messages[-1].content if messages else ""
 
+    # 근거가 필요 없는 general 답변(인사 등)은 검증을 건너뜀
+    if state.get("intent") == "general":
+        return {"is_grounded": True, "grounding_reason": None}
+
     vector_results = state.get("vector_results")
     db_results = state.get("db_results")
-
-    # 검증할 근거 자체가 없으면 (general 답변 등) 검증을 건너뜀
-    if not vector_results and not db_results:
-        return {"is_grounded": True, "grounding_reason": None}
 
     context_parts = []
     if vector_results:
@@ -437,12 +438,14 @@ def grade_answer(state: AgentState) -> AgentState:
             context_parts.append(f"[문서 {i}]\n{doc.page_content}")
     if db_results:
         context_parts.append(f"[DB 조회 결과]\n{db_results}")
-    context = "\n\n".join(context_parts)
+    # 검색 결과가 비어있는 경우도 명시적으로 전달 (근거 없이 답변했는지 판단 가능하도록)
+    context = "\n\n".join(context_parts) if context_parts else "(검색된 근거 없음)"
 
     system_prompt = f"""
 당신은 AI 답변의 사실 근거를 검증하는 평가자입니다.
 
 아래 <근거> 안의 정보만을 기준으로, <답변>의 핵심 내용이 실제로 근거에 의해 뒷받침되는지 평가하세요.
+근거가 "(검색된 근거 없음)"인데 답변이 구체적인 사실을 주장하고 있다면, 이는 근거 없이 지어낸 답변이므로 반드시 is_grounded: false로 평가하세요.
 
 <근거>
 {context}
